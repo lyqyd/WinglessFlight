@@ -1,0 +1,12 @@
+/build
+/download
+/bin
+/out
+*.DS_Store
+.idea/
+Thumbs.db
+ForgeModLoader-client*
+/.gradle
+/eclipse
+/.settings
+.classpath
