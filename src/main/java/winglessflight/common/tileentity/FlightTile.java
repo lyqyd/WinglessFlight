@@ -62,7 +62,7 @@ public class FlightTile extends TileEntity {
 	@Override
 	public void updateEntity() {
 		super.updateEntity();
-		List<EntityPlayerMP> players = worldObj.getEntitiesWithinAABB(EntityPlayerMP.class, AxisAlignedBB.getBoundingBox((float)this.xCoord - 24.0f, 0.0f, (float)this.zCoord - 24.0f, (float)this.xCoord + 24.0f, 256.0f, (float)this.zCoord + 24.0f));
+		List<EntityPlayerMP> players = worldObj.getEntitiesWithinAABB(EntityPlayerMP.class, AxisAlignedBB.getBoundingBox((float)this.xCoord - 32.0f, 0.0f, (float)this.zCoord - 32.0f, (float)this.xCoord + 32.0f, 256.0f, (float)this.zCoord + 32.0f));
 		for (EntityPlayerMP player : players) {
 			if (!this.trackedPlayers.contains(player)) {
 				WFLog.info("player %s in range", player.getDisplayName());
