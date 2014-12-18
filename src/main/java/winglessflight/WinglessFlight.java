@@ -1,6 +1,7 @@
 package winglessflight;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import winglessflight.common.CommonProxy;
 import winglessflight.common.block.FlightBlock;
@@ -12,7 +13,7 @@ import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
-@Mod(modid = "WinglessFlight", name = "WinglessFlight", version = "0.0.1")
+@Mod(modid = "WinglessFlight", name = "WinglessFlight", version = "0.0.2")
 public class WinglessFlight {
 	
 	public static class Blocks {
@@ -20,6 +21,7 @@ public class WinglessFlight {
 	}
 	
 	public static ArrayList<String> fallingPlayers = new ArrayList<String>();
+	public static HashMap<String, Integer> flyingPlayers = new HashMap();
 	
 	@Instance(value = "WinglessFlight")
 	public static WinglessFlight instance;

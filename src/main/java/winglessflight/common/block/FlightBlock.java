@@ -2,6 +2,7 @@ package winglessflight.common.block;
 
 import cpw.mods.fml.common.registry.GameRegistry;
 import winglessflight.common.tileentity.FlightTile;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockContainer;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.renderer.texture.IIconRegister;
@@ -39,6 +40,15 @@ public class FlightBlock extends BlockContainer {
 	@Override
 	public TileEntity createNewTileEntity(World world, int meta) {
 		return new FlightTile();
+	}
+	
+	@Override
+	public void breakBlock(World world, int x, int y, int z, Block block, int n) {
+		TileEntity tile = world.getTileEntity(x, y, z);
+		if (tile instanceof FlightTile) {
+			((FlightTile)tile).dropAllFlyers();
+		}
+		super.breakBlock(world, x, y, z, block, n);
 	}
 
 }

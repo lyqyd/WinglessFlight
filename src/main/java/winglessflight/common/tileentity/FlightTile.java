@@ -5,6 +5,7 @@ import java.util.List;
 
 import winglessflight.WinglessFlight;
 import winglessflight.common.util.WFLog;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -17,6 +18,47 @@ public class FlightTile extends TileEntity {
 	private ArrayList<EntityPlayerMP> trackedPlayers = new ArrayList<EntityPlayerMP>();
 	private ArrayList<String> fallingPlayers = new ArrayList<String>();
 
+	private void dropPlayer(EntityPlayerMP player) {
+		WFLog.info("dropping player %s", player.getDisplayName());
+		int count = WinglessFlight.flyingPlayers.get(player.getDisplayName());
+		count--;
+		WinglessFlight.flyingPlayers.put(player.getDisplayName(), count);
+		WFLog.info("player %s has %d active flights", player.getDisplayName(), count);
+		if (!player.onGround) {
+			if (!this.fallingPlayers.contains(player.getDisplayName())) {
+				this.fallingPlayers.add(player.getDisplayName());
+			}
+			if (!WinglessFlight.fallingPlayers.contains(player.getDisplayName())) {
+				WinglessFlight.fallingPlayers.add(player.getDisplayName());
+			}
+		}
+		//disable flying if necessary
+		if (!player.capabilities.isCreativeMode && count == 0) {
+			WFLog.info("player %s flight disabled", player.getDisplayName());
+			player.capabilities.allowFlying = false;
+			player.capabilities.isFlying = false;
+			player.sendPlayerAbilities();
+		}
+	}
+	
+	private void flyPlayer(EntityPlayerMP player) {
+		player.capabilities.allowFlying = true;
+		player.sendPlayerAbilities();
+		int count = 0;
+		if (WinglessFlight.flyingPlayers.containsKey(player.getDisplayName())) {
+			count = WinglessFlight.flyingPlayers.get(player.getDisplayName());
+		}
+		count++;
+		WinglessFlight.flyingPlayers.put(player.getDisplayName(), count);
+		WFLog.info("player %s given flight, has %d active flights", player.getDisplayName(), count);
+		if (this.fallingPlayers.contains(player.getDisplayName())) {
+			this.fallingPlayers.remove(player.getDisplayName());
+		}
+		if (WinglessFlight.fallingPlayers.contains(player.getDisplayName())) {
+			WinglessFlight.fallingPlayers.remove(player.getDisplayName());
+		}
+	}
+	
 	@Override
 	public void updateEntity() {
 		super.updateEntity();
@@ -26,35 +68,14 @@ public class FlightTile extends TileEntity {
 				WFLog.info("player %s in range", player.getDisplayName());
 				if (player.isDead) {continue;}
 				
-				player.capabilities.allowFlying = true;
-				player.sendPlayerAbilities();
-				WFLog.info("player %s given flight", player.getDisplayName());
-				if (WinglessFlight.fallingPlayers.contains(player.getDisplayName())) {
-					WinglessFlight.fallingPlayers.remove(player.getDisplayName());
-				}
-				if (this.fallingPlayers.contains(player)) {
-					this.fallingPlayers.remove(player);
-				}
+				flyPlayer(player);
 			}
 		}
 		
 		for (EntityPlayerMP tracked : this.trackedPlayers) {
-			if (!players.contains(tracked) && !tracked.onGround) {
+			if (!players.contains(tracked)) {
 				WFLog.info("player %s left range", tracked.getDisplayName());
-				//player is outside the bounds now and is in the air.
-				if (!this.fallingPlayers.contains(tracked.getDisplayName())) {
-					this.fallingPlayers.add(tracked.getDisplayName());
-				}
-				if (!WinglessFlight.fallingPlayers.contains(tracked.getDisplayName())) {
-					WinglessFlight.fallingPlayers.add(tracked.getDisplayName());
-				}
-				//disable flying if necessary
-				if (!tracked.capabilities.isCreativeMode) {
-					WFLog.info("player %s flight disabled", tracked.getDisplayName());
-					tracked.capabilities.allowFlying = false;
-					tracked.capabilities.isFlying = false;
-					tracked.sendPlayerAbilities();
-				}
+				dropPlayer(tracked);
 			}
 		}
 		
@@ -73,6 +94,26 @@ public class FlightTile extends TileEntity {
 			this.fallingPlayers.add(name);
 			WinglessFlight.fallingPlayers.add(name);
 		}
+		
+		NBTTagList flyingNames = tag.getTagList("FlyingNames", 10);
+		for (int i = 0; i < names.tagCount(); i++) {
+			NBTTagCompound info = names.getCompoundTagAt(i);
+			String name = info.getString("Name");
+			EntityPlayer player = worldObj.getPlayerEntityByName(name);
+			if (player != null && player instanceof EntityPlayerMP) {
+				this.trackedPlayers.add((EntityPlayerMP) player);
+				player.capabilities.allowFlying = true;
+				int count = 0;
+				if (WinglessFlight.flyingPlayers.containsKey(player.getDisplayName())) {
+					count = WinglessFlight.flyingPlayers.get(player.getDisplayName());
+				}
+				count++;
+				WinglessFlight.flyingPlayers.put(player.getDisplayName(), count);
+				if (info.getBoolean("IsFlying")) {
+					player.capabilities.isFlying = true;
+				}
+			}
+		}
 	}
 	
 	@Override
@@ -83,11 +124,22 @@ public class FlightTile extends TileEntity {
 		for (String name : this.fallingPlayers) {
 			names.appendTag(new NBTTagString(name));
 		}
+		NBTTagList flying = new NBTTagList();
 		for (EntityPlayerMP player : this.trackedPlayers) {
-			names.appendTag(new NBTTagString(player.getDisplayName()));
+			NBTTagCompound info = new NBTTagCompound();
+			info.setString("Name", player.getCommandSenderName());
+			info.setBoolean("IsFlying", player.capabilities.isFlying);
+			flying.appendTag(info);
 		}
 		
 		tag.setTag("Names", names);
+		tag.setTag("FlyingNames", flying);
+	}
+	
+	public void dropAllFlyers() {
+		for (EntityPlayerMP player : this.trackedPlayers) {
+			dropPlayer(player);
+		}
 	}
 
 }
