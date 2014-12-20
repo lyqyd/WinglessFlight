@@ -3,6 +3,8 @@ package winglessflight;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import net.minecraftforge.common.config.Configuration;
+import net.minecraftforge.common.config.Property;
 import winglessflight.common.CommonProxy;
 import winglessflight.common.block.FlightBlock;
 import winglessflight.common.util.WFLog;
@@ -13,14 +15,19 @@ import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
-@Mod(modid = "WinglessFlight", name = "WinglessFlight", version = "0.0.2")
+@Mod(modid = "WinglessFlight", name = "WinglessFlight", version = "0.0.3")
 public class WinglessFlight {
 	
 	public static class Blocks {
 		public static FlightBlock flightBlock;
 	}
 	
-	public static ArrayList<String> fallingPlayers = new ArrayList<String>();
+	public static class Config {
+		public static boolean silkTouchRequired;
+		public static int chargeTime;
+		public static int radius;
+	}
+	
 	public static HashMap<String, Integer> flyingPlayers = new HashMap();
 	
 	@Instance(value = "WinglessFlight")
@@ -32,6 +39,23 @@ public class WinglessFlight {
 	@EventHandler
 	public void preInit(FMLPreInitializationEvent event) {
 		WFLog.init();
+		
+		Configuration configFile = new Configuration(event.getSuggestedConfigurationFile());
+		
+		Property prop = configFile.get("balance", "silkTouchRequired", true);
+		prop.comment = "Flight Blocks require silk touch to pick up intact";
+		Config.silkTouchRequired = prop.getBoolean();
+		
+		prop = configFile.get("balance", "chargeTime", 10);
+		prop.comment = "Time Flight Blocks require to charge before working, in seconds";
+		Config.chargeTime = prop.getInt();
+		
+		prop = configFile.get("balance", "radius", 32);
+		prop.comment = "Distance in blocks for Flight Blocks to enable flight";
+		Config.radius = prop.getInt();
+
+		configFile.save();
+		
 		proxy.preInit();
 	}
 	

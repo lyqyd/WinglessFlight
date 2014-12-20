@@ -1,5 +1,6 @@
 package winglessflight.common;
 
+import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.registry.GameRegistry;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
@@ -8,11 +9,13 @@ import net.minecraftforge.common.MinecraftForge;
 import winglessflight.WinglessFlight;
 import winglessflight.common.block.FlightBlock;
 import winglessflight.common.handler.FallDamageHandler;
+import winglessflight.common.handler.PlayerPresenceHandler;
 
 public class CommonProxy {
 
 	public void preInit() {
-		MinecraftForge.EVENT_BUS.register(new FallDamageHandler());
+		MinecraftForge.EVENT_BUS.register(FallDamageHandler.instance);
+		FMLCommonHandler.instance().bus().register(PlayerPresenceHandler.instance);
 		registerBlocks();
 	}
 	
