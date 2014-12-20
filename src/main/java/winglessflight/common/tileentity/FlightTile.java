@@ -159,10 +159,9 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 
 	@Override
 	public void onLogout(PlayerLoggedOutEvent event) {
-		if (this.trackedPlayers.contains((EntityPlayerMP)event.player)) {
-			if (event.player.capabilities.isFlying) {
-				this.flyingWhenLeft.add(event.player.getDisplayName());
-			}
+		int radius = WinglessFlight.Config.radius;
+		if (event.player.capabilities.isFlying && event.player.posX >= this.xCoord - radius && event.player.posX <= this.xCoord + radius && event.player.posY >= 0 && event.player.posY <= 256 && event.player.posZ >= this.zCoord - radius && event.player.posZ <= this.zCoord + radius) {
+			this.flyingWhenLeft.add(event.player.getDisplayName());
 		}
 	}
 
