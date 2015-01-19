@@ -15,7 +15,7 @@ import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
-@Mod(modid = "WinglessFlight", name = "WinglessFlight", version = "0.0.4")
+@Mod(modid = "WinglessFlight", name = "WinglessFlight", version = "0.0.5")
 public class WinglessFlight {
 	
 	public static class Blocks {
@@ -26,6 +26,8 @@ public class WinglessFlight {
 		public static boolean silkTouchRequired;
 		public static int chargeTime;
 		public static int radius;
+		public static boolean cheapRecipe;
+		public static boolean debug = false;
 	}
 	
 	public static HashMap<String, Integer> flyingPlayers = new HashMap();
@@ -53,6 +55,10 @@ public class WinglessFlight {
 		prop = configFile.get("balance", "radius", 32);
 		prop.comment = "Distance in blocks for Flight Blocks to enable flight";
 		Config.radius = prop.getInt();
+		
+		prop = configFile.get("balance", "cheapRecipe", false);
+		prop.comment = "Use a significantly cheaper crafting recipe for the flight blocks.";
+		Config.cheapRecipe = prop.getBoolean();
 
 		configFile.save();
 		

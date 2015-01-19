@@ -18,11 +18,14 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.Vec3;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
 
 public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IFallDamageHandler {
 	
 	private ArrayList<EntityPlayerMP> trackedPlayers = new ArrayList<EntityPlayerMP>();
+	private ArrayList<String> trackedNames = new ArrayList<String>();
 	private ArrayList<String> fallingPlayers = new ArrayList<String>();
 	private ArrayList<String> flyingWhenLeft = new ArrayList<String>();
 	private boolean enabled = false;
@@ -36,11 +39,26 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 			worldObj.setBlockMetadataWithNotify(this.xCoord, this.yCoord, this.zCoord, 1, 6);
 		}
 	}
+	
+	private Vec3 randomSpot(int x0, int y0, int z0) {
+		double radius = 5.0d;
+		double u = Math.random();
+		double v = Math.random();
+		double theta = 2 * Math.PI * u;
+		double phi = Math.acos(2 * v - 1);
+		double x = x0 + (radius * Math.sin(phi) * Math.cos(theta));
+		double y = y0 + (radius * Math.sin(phi) * Math.sin(theta));
+		double z = z0 + (radius * Math.cos(phi));
+		return Vec3.createVectorHelper(x, y, z);
+	}
 
 	private void dropPlayer(EntityPlayerMP player) {
 		int count = WinglessFlight.flyingPlayers.get(player.getDisplayName());
 		count--;
-		WinglessFlight.flyingPlayers.put(player.getDisplayName(), count);
+		if (WinglessFlight.Config.debug) {
+			WFLog.info("%d%d%d dropping player %s, %d tickets", this.xCoord, this.yCoord, this.zCoord, player.getDisplayName(), count);
+		}
+		WinglessFlight.flyingPlayers.put(player.getDisplayName(), Math.max(count, 0));
 		if (!player.onGround && count == 0) {
 			if (!this.fallingPlayers.contains(player.getDisplayName())) {
 				this.fallingPlayers.add(player.getDisplayName());
@@ -63,6 +81,9 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 		}
 		count++;
 		WinglessFlight.flyingPlayers.put(player.getDisplayName(), count);
+		if (WinglessFlight.Config.debug) {
+			WFLog.info("%d%d%d flying player %s, %d tickets", this.xCoord, this.yCoord, this.zCoord, player.getDisplayName(), count);
+		}
 		if (this.fallingPlayers.contains(player.getDisplayName())) {
 			this.fallingPlayers.remove(player.getDisplayName());
 		}
@@ -76,7 +97,7 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 				float radius = (float) WinglessFlight.Config.radius;
 				List<EntityPlayerMP> players = worldObj.getEntitiesWithinAABB(EntityPlayerMP.class, AxisAlignedBB.getBoundingBox((float)this.xCoord - radius, 0.0f, (float)this.zCoord - radius, (float)this.xCoord + radius, 256.0f, (float)this.zCoord + radius));
 				for (EntityPlayerMP player : players) {
-					if (!this.trackedPlayers.contains(player)) {
+					if (!this.trackedPlayers.contains(player) && !this.trackedNames.contains(player.getDisplayName())) {
 						if (player.isDead) {continue;}
 						
 						flyPlayer(player);
@@ -97,6 +118,15 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 				if (this.chargeTime > WinglessFlight.Config.chargeTime * 20) {
 					this.enabled = true;
 					worldObj.setBlockMetadataWithNotify(this.xCoord, this.yCoord, this.zCoord, 1, 6);
+				}
+			}
+		} else {
+			if (this.worldObj.getBlockMetadata(this.xCoord, this.yCoord, this.zCoord) != 1) {
+				//spawn particles to show charging.
+				double velocity = 0.6d;
+				for (int i = 0; i < 4; i++) {
+					Vec3 vec = this.randomSpot(this.xCoord, this.yCoord, this.zCoord);
+					this.worldObj.spawnParticle("crit", vec.xCoord + 0.5d, vec.yCoord + 0.5d, vec.zCoord + 0.5d, ((double)this.xCoord - vec.xCoord) * velocity, ((double)this.yCoord - vec.yCoord) * velocity, ((double)this.zCoord - vec.zCoord) * velocity);
 				}
 			}
 		}
@@ -149,6 +179,7 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 	@Override
 	public void onLogin(PlayerLoggedInEvent event) {
 		if (this.flyingWhenLeft.contains(event.player.getDisplayName())) {
+			this.flyingWhenLeft.remove(event.player.getDisplayName());
 			int radius = WinglessFlight.Config.radius;
 			if (event.player.posX >= this.xCoord - radius && event.player.posX <= this.xCoord + radius && event.player.posY >= 0 && event.player.posY <= 256 && event.player.posZ >= this.zCoord - radius && event.player.posZ <= this.zCoord + radius) {
 				event.player.capabilities.allowFlying = true;
@@ -172,6 +203,19 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 			this.fallingPlayers.remove(((EntityPlayerMP)event.entityLiving).getDisplayName());
 		}
 		
+	}
+
+	@Override
+	public void onWorldChange(EntityJoinWorldEvent event) {
+		EntityPlayerMP player = (EntityPlayerMP) event.entity;
+		if (event.world.provider.dimensionId != this.worldObj.provider.dimensionId) {
+			for (EntityPlayerMP tracked : this.trackedPlayers) {
+				if (WinglessFlight.Config.debug) WFLog.info("dropping player %s", player.getDisplayName());
+				if (player.getDisplayName() == tracked.getDisplayName()) {
+					this.fallingPlayers.add(player.getDisplayName());
+				}
+			}
+		}
 	}
 
 }

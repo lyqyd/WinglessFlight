@@ -2,6 +2,8 @@ package winglessflight.common.handler;
 
 import java.util.ArrayList;
 
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import winglessflight.WinglessFlight;
 import winglessflight.common.util.WFLog;
 import cpw.mods.fml.common.Mod.EventHandler;
@@ -30,6 +32,25 @@ public class PlayerPresenceHandler {
 		synchronized(listeners) {
 			for (IPlayerPresenceHandler listener : listeners) {
 				listener.onLogout(event);
+			}
+		}
+	}
+	
+	@SubscribeEvent
+	public void onEntityJoinWorld(EntityJoinWorldEvent event) {
+		if (event.entity != null && event.entity instanceof EntityPlayerMP) {
+			EntityPlayerMP player = (EntityPlayerMP) event.entity;
+			if (WinglessFlight.Config.debug) WFLog.info("PPH EJW %s %d", event.entity.getCommandSenderName(), event.world.provider.dimensionId);
+			String name = player.getDisplayName();
+			if (WinglessFlight.flyingPlayers.get(name) != null && WinglessFlight.flyingPlayers.get(name) > 0) {
+				WinglessFlight.flyingPlayers.put(name, 0);
+				synchronized(listeners) {
+					for (IPlayerPresenceHandler listener : listeners) {
+						listener.onWorldChange(event);
+					}
+				}
+			} else {
+				WinglessFlight.flyingPlayers.put(name, 0);
 			}
 		}
 	}

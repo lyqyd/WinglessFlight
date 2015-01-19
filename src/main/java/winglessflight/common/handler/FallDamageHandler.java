@@ -7,6 +7,7 @@ import winglessflight.common.util.WFLog;
 import cpw.mods.fml.common.Mod.EventHandler;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
 
 public class FallDamageHandler {

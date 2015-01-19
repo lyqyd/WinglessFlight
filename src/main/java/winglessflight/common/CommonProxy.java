@@ -15,6 +15,7 @@ public class CommonProxy {
 
 	public void preInit() {
 		MinecraftForge.EVENT_BUS.register(FallDamageHandler.instance);
+		MinecraftForge.EVENT_BUS.register(PlayerPresenceHandler.instance);
 		FMLCommonHandler.instance().bus().register(PlayerPresenceHandler.instance);
 		registerBlocks();
 	}
@@ -34,10 +35,18 @@ public class CommonProxy {
 		ItemStack feather = new ItemStack((Item)Item.itemRegistry.getObject("feather"));
 		ItemStack gold = new ItemStack((Block)Block.blockRegistry.getObject("gold_block"));
 		ItemStack diamond_item = new ItemStack((Item)Item.itemRegistry.getObject("diamond"));
-		GameRegistry.addRecipe(flightBlock,
-				"gig",
-				"dfd",
-				"eie",
-		        'd', diamond, 'e', emerald, 'f', feather, 'g', gold, 'i', diamond_item);
+		if (WinglessFlight.Config.cheapRecipe) {
+			GameRegistry.addRecipe(flightBlock,
+					" g ",
+					"ifi",
+					" e ",
+			        'e', emerald, 'f', feather, 'g', gold, 'i', diamond_item);
+		} else {
+			GameRegistry.addRecipe(flightBlock,
+					"gig",
+					"dfd",
+					"eie",
+			        'd', diamond, 'e', emerald, 'f', feather, 'g', gold, 'i', diamond_item);
+		}
 	}
 }
