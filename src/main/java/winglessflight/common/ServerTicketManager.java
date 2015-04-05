@@ -8,6 +8,7 @@ import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import winglessflight.common.handler.IPlayerPresenceHandler;
 import winglessflight.common.handler.PlayerPresenceHandler;
+import winglessflight.common.util.WFLog;
 
 public class ServerTicketManager implements IPlayerPresenceHandler {
 
@@ -38,7 +39,13 @@ public class ServerTicketManager implements IPlayerPresenceHandler {
 	public void onLogin(PlayerLoggedInEvent event) {
 		// TODO Auto-generated method stub
 		String id = event.player.getUniqueID().toString();
-		ticketManagers.put(id, new PlayerTicketManager(event.player));
+		if (event.player instanceof EntityPlayerMP) {
+			EntityPlayerMP player = (EntityPlayerMP) event.player;
+			ticketManagers.put(id, new PlayerTicketManager(player));
+		} else {
+			WFLog.debug("Event player isn't EntityPlayerMP onLogin");
+		}
+		
 	}
 
 	@Override

@@ -19,7 +19,6 @@ public class PlayerPresenceHandler {
 
 	@SubscribeEvent
 	public void onPlayerJoin(PlayerLoggedInEvent event) {
-		WinglessFlight.flyingPlayers.put(event.player.getDisplayName(), 0);
 		synchronized(listeners) {
 			for (IPlayerPresenceHandler listener : listeners) {
 				listener.onLogin(event);
@@ -40,17 +39,12 @@ public class PlayerPresenceHandler {
 	public void onEntityJoinWorld(EntityJoinWorldEvent event) {
 		if (event.entity != null && event.entity instanceof EntityPlayerMP) {
 			EntityPlayerMP player = (EntityPlayerMP) event.entity;
-			if (WinglessFlight.Config.debug) WFLog.info("PPH EJW %s %d", event.entity.getCommandSenderName(), event.world.provider.dimensionId);
+			WFLog.debug("PPH EJW %s %d", player.getDisplayName(), event.world.provider.dimensionId);
 			String name = player.getDisplayName();
-			if (WinglessFlight.flyingPlayers.get(name) != null && WinglessFlight.flyingPlayers.get(name) > 0) {
-				WinglessFlight.flyingPlayers.put(name, 0);
-				synchronized(listeners) {
-					for (IPlayerPresenceHandler listener : listeners) {
-						listener.onWorldChange(event);
-					}
+			synchronized(listeners) {
+				for (IPlayerPresenceHandler listener : listeners) {
+					listener.onWorldChange(event);
 				}
-			} else {
-				WinglessFlight.flyingPlayers.put(name, 0);
 			}
 		}
 	}

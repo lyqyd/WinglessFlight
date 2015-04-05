@@ -9,10 +9,21 @@ import net.minecraft.util.ChunkCoordinates;
 public class PlayerTicketManager {
 	
 	private ArrayList<FlightTicket> ticketList = new ArrayList<FlightTicket>();
-	private EntityPlayer player;
+	private EntityPlayerMP player;
 	
-	public PlayerTicketManager (EntityPlayer player) {
+	public PlayerTicketManager (EntityPlayerMP player) {
 		this.player = player;
+	}
+	
+	public void update() {
+		if (this.getFlightTicketCount() > 0 && !this.player.capabilities.allowFlying) {
+			this.player.capabilities.allowFlying = true;
+			this.player.sendPlayerAbilities();
+		} else if (this.getFlightTicketCount() == 0 && this.player.capabilities.allowFlying) {
+			this.player.capabilities.allowFlying = false;
+			this.player.capabilities.isFlying = false;
+			this.player.sendPlayerAbilities();
+		}
 	}
 
 	public void addTicket(FlightTicket ticket) {
@@ -25,11 +36,8 @@ public class PlayerTicketManager {
 		}
 		if (!ticketExists) {
 			ticketList.add(ticket);
-			if (this.getFlightTicketCount() > 0) {
-				this.player.capabilities.allowFlying = true;
-				this.player.sendPlayerAbilities();
-			}
 		}
+		this.update();
 	}
 	
 	public void removeTicket(ChunkCoordinates location) {
@@ -39,11 +47,7 @@ public class PlayerTicketManager {
 				break;
 			}
 		}
-		if (this.getFlightTicketCount() == 0) {
-			this.player.capabilities.allowFlying = false;
-			this.player.capabilities.isFlying = false;
-			this.player.sendPlayerAbilities();
-		}
+		this.update();
 	}
 	
 	public void removeTicket(FlightTicket ticket) {

@@ -69,6 +69,9 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 		
 		if (!player.onGround && count == 0) {
 			this.tickets.get(player).setFalling();
+			if (manager != null) {
+				manager.update();
+			}
 		} else {
 			if (manager != null) {
 				manager.removeTicket(this.tickets.get(player));
@@ -214,7 +217,6 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 		if (event.player.capabilities.isFlying && event.player.posX >= this.xCoord - radius && event.player.posX <= this.xCoord + radius && event.player.posY >= 0 && event.player.posY <= 256 && event.player.posZ >= this.zCoord - radius && event.player.posZ <= this.zCoord + radius) {
 			this.flyingWhenLeft.add(event.player.getDisplayName());
 		} else if (manager.getFlightTicketCount() == 0) {
-			
 		}
 	}
 

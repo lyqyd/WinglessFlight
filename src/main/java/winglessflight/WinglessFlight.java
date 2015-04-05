@@ -30,8 +30,6 @@ public class WinglessFlight {
 		public static boolean debug = false;
 	}
 	
-	public static HashMap<String, Integer> flyingPlayers = new HashMap();
-	
 	@Instance(value = "WinglessFlight")
 	public static WinglessFlight instance;
 	
