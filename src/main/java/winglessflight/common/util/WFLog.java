@@ -27,5 +27,9 @@ public class WFLog {
 	public static void warn(String format, Object... data) {
 		log(Level.WARN, format, data);
 	}
+	
+	public static void debug(String format, Object... data) {
+		log(Level.DEBUG, format, data);
+	}
 
 }
