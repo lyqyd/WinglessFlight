@@ -1,11 +1,16 @@
 package winglessflight.common.tileentity;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map.Entry;
 
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import winglessflight.WinglessFlight;
+import winglessflight.common.FlightTicket;
+import winglessflight.common.PlayerTicketManager;
+import winglessflight.common.ServerTicketManager;
 import winglessflight.common.handler.FallDamageHandler;
 import winglessflight.common.handler.IFallDamageHandler;
 import winglessflight.common.handler.IPlayerPresenceHandler;
@@ -18,16 +23,16 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
 
 public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IFallDamageHandler {
-	
-	private ArrayList<EntityPlayerMP> trackedPlayers = new ArrayList<EntityPlayerMP>();
-	private ArrayList<String> trackedNames = new ArrayList<String>();
-	private ArrayList<String> fallingPlayers = new ArrayList<String>();
+
 	private ArrayList<String> flyingWhenLeft = new ArrayList<String>();
+	private ArrayList<String> fallingWhenLeft = new ArrayList<String>();
+	private HashMap<EntityPlayerMP, FlightTicket> tickets = new HashMap<EntityPlayerMP, FlightTicket>();
 	private boolean enabled = false;
 	private int chargeTime = 0;
 	
@@ -53,40 +58,48 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 	}
 
 	private void dropPlayer(EntityPlayerMP player) {
-		int count = WinglessFlight.flyingPlayers.get(player.getDisplayName());
-		count--;
-		if (WinglessFlight.Config.debug) {
-			WFLog.info("%d%d%d dropping player %s, %d tickets", this.xCoord, this.yCoord, this.zCoord, player.getDisplayName(), count);
+		String id = player.getUniqueID().toString();
+		int count = 0;
+		PlayerTicketManager manager = ServerTicketManager.instance.getManagerForPlayer(player);
+		if (manager != null) {
+			count = manager.getTicketCount();
+			WFLog.debug("%d, %d, %d dropping player %s, %d -> %d flight tickets", this.xCoord, this.yCoord, this.zCoord, player.getDisplayName(), count, count--);
+			//don't remove the ticket here, it'll be removed either below, where it's removed from this instance, or in the fall damage event.
 		}
-		WinglessFlight.flyingPlayers.put(player.getDisplayName(), Math.max(count, 0));
+		
 		if (!player.onGround && count == 0) {
-			if (!this.fallingPlayers.contains(player.getDisplayName())) {
-				this.fallingPlayers.add(player.getDisplayName());
+			this.tickets.get(player).setFalling();
+		} else {
+			if (manager != null) {
+				manager.removeTicket(this.tickets.get(player));
 			}
-		}
-		//disable flying if necessary
-		if (!player.capabilities.isCreativeMode && count == 0) {
-			player.capabilities.allowFlying = false;
-			player.capabilities.isFlying = false;
-			player.sendPlayerAbilities();
+			this.tickets.remove(player);
 		}
 	}
 	
 	private void flyPlayer(EntityPlayerMP player) {
-		player.capabilities.allowFlying = true;
-		player.sendPlayerAbilities();
 		int count = 0;
-		if (WinglessFlight.flyingPlayers.containsKey(player.getDisplayName())) {
-			count = WinglessFlight.flyingPlayers.get(player.getDisplayName());
+		PlayerTicketManager manager = ServerTicketManager.instance.getManagerForPlayer(player);
+		String id = player.getUniqueID().toString();
+		FlightTicket ticket;
+		if (this.tickets.containsKey(player)) {
+			ticket = this.tickets.get(player);
+			ticket.setFlying();
+		} else {
+			ticket = new FlightTicket(this.xCoord, this.yCoord, this.zCoord, this.worldObj.provider.dimensionId, id);
+			this.tickets.put(player, ticket);
 		}
-		count++;
-		WinglessFlight.flyingPlayers.put(player.getDisplayName(), count);
-		if (WinglessFlight.Config.debug) {
-			WFLog.info("%d%d%d flying player %s, %d tickets", this.xCoord, this.yCoord, this.zCoord, player.getDisplayName(), count);
+		if (manager != null) {
+			count = manager.getFlightTicketCount();
+			manager.addTicket(ticket);
+			WFLog.debug("%d, %d, %d flying player %s, %d -> %d tickets", this.xCoord, this.yCoord, this.zCoord, player.getDisplayName(), count, count++);
 		}
-		if (this.fallingPlayers.contains(player.getDisplayName())) {
-			this.fallingPlayers.remove(player.getDisplayName());
-		}
+	}
+	
+	@Override
+	public void invalidate() {
+		this.dropAllFlyers();
+		super.invalidate();
 	}
 	
 	@Override
@@ -97,22 +110,18 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 				float radius = (float) WinglessFlight.Config.radius;
 				List<EntityPlayerMP> players = worldObj.getEntitiesWithinAABB(EntityPlayerMP.class, AxisAlignedBB.getBoundingBox((float)this.xCoord - radius, 0.0f, (float)this.zCoord - radius, (float)this.xCoord + radius, 256.0f, (float)this.zCoord + radius));
 				for (EntityPlayerMP player : players) {
-					if (!this.trackedPlayers.contains(player) && !this.trackedNames.contains(player.getDisplayName())) {
+					if (!this.tickets.containsKey(player)) {
 						if (player.isDead) {continue;}
 						
 						flyPlayer(player);
 					}
 				}
 				
-				for (EntityPlayerMP tracked : this.trackedPlayers) {
+				for (EntityPlayerMP tracked : this.tickets.keySet()) {
 					if (!players.contains(tracked)) {
 						dropPlayer(tracked);
 					}
 				}
-				
-				//remove all players from tracking list and add them fresh from the AABB list.
-				this.trackedPlayers.clear();
-				this.trackedPlayers.addAll(players);
 			} else {
 				this.chargeTime++;
 				if (this.chargeTime > WinglessFlight.Config.chargeTime * 20) {
@@ -138,12 +147,14 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 		NBTTagList names = tag.getTagList("Names", 8);
 		for (int i = 0; i < names.tagCount(); i++) {
 			String name = names.getStringTagAt(i);
-			this.fallingPlayers.add(name);
+			this.fallingWhenLeft.add(name);
 		}
 		NBTTagList flying = tag.getTagList("FlyingNames", 8);
 		for (int i = 0; i < flying.tagCount(); i++) {
 			this.flyingWhenLeft.add(flying.getStringTagAt(i));
 		}
+		NBTTagList ids = tag.getTagList("UUIDs", 8);
+		NBTTagList flyingIDs = tag.getTagList("FlyingUUIDs", 8);
 		
 		this.chargeTime = tag.getInteger("chargeTime");
 	}
@@ -152,26 +163,30 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 		super.writeToNBT(tag);
 		
 		NBTTagList names = new NBTTagList();
-		for (String name : this.fallingPlayers) {
-			names.appendTag(new NBTTagString(name));
-		}
 		NBTTagList flying = new NBTTagList();
-		for (EntityPlayerMP player : this.trackedPlayers) {
-			if (player.capabilities.isFlying) {
-				flying.appendTag(new NBTTagString(player.getDisplayName()));
+		for (Entry<EntityPlayerMP, FlightTicket> entry : this.tickets.entrySet()) {
+			EntityPlayerMP player = entry.getKey();
+			String id = player.getUniqueID().toString();
+			if (entry.getValue().isFalling()) {
+				names.appendTag(new NBTTagString(id));
+			} else if (player.capabilities.isFlying) {
+				flying.appendTag(new NBTTagString(id));
 			}
 		}
 		for (String name : this.flyingWhenLeft) {
 			flying.appendTag(new NBTTagString(name));
 		}
+		for (String name : this.fallingWhenLeft) {
+			names.appendTag(new NBTTagString(name));
+		}
 		
-		tag.setTag("Names", names);
-		tag.setTag("FlyingNames", flying);
+		tag.setTag("UUIDs", names);
+		tag.setTag("FlyingUUIDs", flying);
 		tag.setInteger("chargeTime", this.chargeTime);
 	}
 	
 	public void dropAllFlyers() {
-		for (EntityPlayerMP player : this.trackedPlayers) {
+		for (EntityPlayerMP player : this.tickets.keySet()) {
 			dropPlayer(player);
 		}
 	}
@@ -182,8 +197,12 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 			this.flyingWhenLeft.remove(event.player.getDisplayName());
 			int radius = WinglessFlight.Config.radius;
 			if (event.player.posX >= this.xCoord - radius && event.player.posX <= this.xCoord + radius && event.player.posY >= 0 && event.player.posY <= 256 && event.player.posZ >= this.zCoord - radius && event.player.posZ <= this.zCoord + radius) {
-				event.player.capabilities.allowFlying = true;
-				event.player.capabilities.isFlying = true;
+				if (event.player instanceof EntityPlayerMP) {
+					EntityPlayerMP player = (EntityPlayerMP)event.player;
+					flyPlayer(player);
+				} else {
+					WFLog.debug("Player logged in, but event player is not instance of EntityPlayerMP");
+				}
 			}
 		}
 	}
@@ -191,16 +210,29 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 	@Override
 	public void onLogout(PlayerLoggedOutEvent event) {
 		int radius = WinglessFlight.Config.radius;
+		PlayerTicketManager manager = ServerTicketManager.instance.getManagerForPlayer(event.player.getUniqueID().toString());
 		if (event.player.capabilities.isFlying && event.player.posX >= this.xCoord - radius && event.player.posX <= this.xCoord + radius && event.player.posY >= 0 && event.player.posY <= 256 && event.player.posZ >= this.zCoord - radius && event.player.posZ <= this.zCoord + radius) {
 			this.flyingWhenLeft.add(event.player.getDisplayName());
+		} else if (manager.getFlightTicketCount() == 0) {
+			
 		}
 	}
 
 	@Override
 	public void onFall(LivingFallEvent event) {
-		if (event.entityLiving instanceof EntityPlayerMP && this.fallingPlayers.contains(((EntityPlayerMP)event.entityLiving).getDisplayName())) {
-			event.distance = 0f;
-			this.fallingPlayers.remove(((EntityPlayerMP)event.entityLiving).getDisplayName());
+		if (event.entityLiving instanceof EntityPlayerMP) {
+			EntityPlayerMP player = (EntityPlayerMP) event.entityLiving;
+			String id = player.getUniqueID().toString();
+			if (this.tickets.containsKey(player) && this.tickets.get(player).isFalling()) {
+				event.distance = 0f;
+				
+				int count = 0;
+				PlayerTicketManager manager = ServerTicketManager.instance.getManagerForPlayer(player);
+				if (manager != null) {
+					manager.removeTicket(this.tickets.get(player));
+				}
+				this.tickets.remove(player);
+			}
 		}
 		
 	}
@@ -209,11 +241,8 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 	public void onWorldChange(EntityJoinWorldEvent event) {
 		EntityPlayerMP player = (EntityPlayerMP) event.entity;
 		if (event.world.provider.dimensionId != this.worldObj.provider.dimensionId) {
-			for (EntityPlayerMP tracked : this.trackedPlayers) {
-				if (WinglessFlight.Config.debug) WFLog.info("dropping player %s", player.getDisplayName());
-				if (player.getDisplayName() == tracked.getDisplayName()) {
-					this.fallingPlayers.add(player.getDisplayName());
-				}
+			if (this.tickets.containsKey(player)) {
+				this.tickets.get(player).setFalling();
 			}
 		}
 	}

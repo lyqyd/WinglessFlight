@@ -17,6 +17,7 @@ public class CommonProxy {
 		MinecraftForge.EVENT_BUS.register(FallDamageHandler.instance);
 		MinecraftForge.EVENT_BUS.register(PlayerPresenceHandler.instance);
 		FMLCommonHandler.instance().bus().register(PlayerPresenceHandler.instance);
+		ServerTicketManager.instance.init();
 		registerBlocks();
 	}
 	
