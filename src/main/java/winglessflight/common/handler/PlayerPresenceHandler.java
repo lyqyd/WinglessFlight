@@ -1,6 +1,8 @@
 package winglessflight.common.handler;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map.Entry;
 
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
@@ -39,11 +41,19 @@ public class PlayerPresenceHandler {
 	public void onEntityJoinWorld(EntityJoinWorldEvent event) {
 		if (event.entity != null && event.entity instanceof EntityPlayerMP) {
 			EntityPlayerMP player = (EntityPlayerMP) event.entity;
-			WFLog.debug("PPH EJW %s %d", player.getDisplayName(), event.world.provider.dimensionId);
+			int dimension = event.world.provider.dimensionId;
+			WFLog.debug("PPH EJW %s %d", player.getDisplayName(), dimension);
 			String name = player.getDisplayName();
 			synchronized(listeners) {
-				for (IPlayerPresenceHandler listener : listeners) {
-					listener.onWorldChange(event);
+				for(IPlayerPresenceHandler listener : listeners) {
+					if (listener.getHandlerDimension() == dimension) {
+						listener.onWorldChange(event);
+					}
+				}
+				for(IPlayerPresenceHandler listener : listeners) {
+					if(listener.getHandlerDimension() != dimension) {
+						listener.onWorldChange(event);
+					}
 				}
 			}
 		}

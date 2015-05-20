@@ -1,7 +1,9 @@
 package winglessflight.common;
 
 import java.util.ArrayList;
+import java.util.function.Predicate;
 
+import winglessflight.common.util.WFLog;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.ChunkCoordinates;
@@ -16,27 +18,34 @@ public class PlayerTicketManager {
 	}
 	
 	public void update() {
+		WFLog.debug("Update for player %s: %d/%d, %b", this.player.getDisplayName(), this.getFlightTicketCount(), this.getTicketCount(), this.player.capabilities.allowFlying);
 		if (this.getFlightTicketCount() > 0 && !this.player.capabilities.allowFlying) {
+			WFLog.debug("Player %s granted flight, %d/%d tickets", this.player.getDisplayName(), this.getFlightTicketCount(), this.getTicketCount());
 			this.player.capabilities.allowFlying = true;
-			this.player.sendPlayerAbilities();
 		} else if (this.getFlightTicketCount() == 0 && this.player.capabilities.allowFlying) {
+			WFLog.debug("Player %s flight removed, %d/%d tickets", this.player.getDisplayName(), this.getFlightTicketCount(), this.getTicketCount());
 			this.player.capabilities.allowFlying = false;
 			this.player.capabilities.isFlying = false;
-			this.player.sendPlayerAbilities();
 		}
+		this.player.sendPlayerAbilities();
+		if (this.player.onGround || this.getFlightTicketCount() > 0) {
+			// Player is on ground or still has flying tickets, remove all falling-mode tickets
+			this.removeFallingModeTickets(false);
+		}
+		WFLog.debug("Finalize update for player %s: %d/%d, %b", this.player.getDisplayName(), this.getFlightTicketCount(), this.getTicketCount(), this.player.capabilities.allowFlying);
 	}
 
 	public void addTicket(FlightTicket ticket) {
 		boolean ticketExists = false;
 		for (FlightTicket t : this.ticketList) {
 			if (t.getLocation().compareTo(ticket.getLocation()) == 0) {
-				ticketExists = true;
+				WFLog.debug("Discarding old ticket from %s as duplicate",  ticket.getLocation().toString());
+				ticketList.remove(t);
 				break;
 			}
 		}
-		if (!ticketExists) {
-			ticketList.add(ticket);
-		}
+		ticketList.add(ticket);
+		WFLog.debug("Adding ticket from %s", ticket.getLocation().toString());
 		this.update();
 	}
 	
@@ -44,6 +53,7 @@ public class PlayerTicketManager {
 		for (FlightTicket t : this.ticketList) {
 			if (t.getLocation().compareTo(location) == 0) {
 				this.ticketList.remove(t);
+				WFLog.debug("Removing ticket from %s", location.toString());
 				break;
 			}
 		}
@@ -54,8 +64,28 @@ public class PlayerTicketManager {
 		for (FlightTicket t : this.ticketList) {
 			if (t == ticket) {
 				this.ticketList.remove(t);
+				WFLog.debug("Removing ticket from %s", ticket.getLocation().toString());
 				break;
 			}
+		}
+		this.update();
+	}
+	
+	private class FallingTickets<T> implements Predicate<FlightTicket> {
+		@Override
+		public boolean test(FlightTicket t) {
+			return t.isFalling();
+		}
+	}
+	
+	protected void removeFallingModeTickets() {
+		this.removeFallingModeTickets(true);
+	}
+	
+	private void removeFallingModeTickets(boolean update) {
+		ticketList.removeIf(new FallingTickets<FlightTicket>());
+		if (update) {
+			this.update();
 		}
 	}
 	

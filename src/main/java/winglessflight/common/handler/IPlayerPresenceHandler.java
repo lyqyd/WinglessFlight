@@ -8,4 +8,5 @@ public interface IPlayerPresenceHandler {
 	void onLogin(PlayerLoggedInEvent event);
 	void onLogout(PlayerLoggedOutEvent event);
 	void onWorldChange(EntityJoinWorldEvent event);
+	int getHandlerDimension();
 }
