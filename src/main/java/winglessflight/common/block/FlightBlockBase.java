@@ -5,7 +5,7 @@ import java.util.Random;
 
 import cpw.mods.fml.common.registry.GameRegistry;
 import winglessflight.WinglessFlight;
-import winglessflight.common.tileentity.FlightTile;
+import winglessflight.common.tileentity.FlightTileBase;
 import winglessflight.common.util.WFLog;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockContainer;
@@ -19,42 +19,29 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.IIcon;
 import net.minecraft.world.World;
 
-public class FlightBlock extends BlockContainer {
+public abstract class FlightBlockBase extends BlockContainer {
 
-	public IIcon[] icons = new IIcon[6];
 	
-	public FlightBlock() {
+	private boolean requiresSilkTouch = false;
+	private ItemStack drop;
+	
+	public FlightBlockBase() {
 		super(Material.ground);
 		setHardness(0.5F);
 		setCreativeTab(CreativeTabs.tabTransport);
-		GameRegistry.registerBlock(this, "flightBlock");
-		GameRegistry.registerTileEntity(FlightTile.class, "flightBlock");
-		setBlockName("winglessflight.flightblock");
-		this.setBlockTextureName("winglessflight:flightblock");
 	}
 	
-	@Override
-	public void registerBlockIcons(IIconRegister register) {
-		for (int i = 0; i < 6; i++) {
-			this.icons[i] = register.registerIcon(this.textureName + "_" + Math.min(i, 2));
-		}
-	}
-	
-	@Override
-	public IIcon getIcon(int side, int meta) {
-		return this.icons[side];
-	}
-
-	@Override
-	public TileEntity createNewTileEntity(World world, int meta) {
-		return new FlightTile();
+	public FlightBlockBase(boolean silk, ItemStack droppedIfNotSilky) {
+		this();
+		this.requiresSilkTouch = silk;
+		this.drop = droppedIfNotSilky;
 	}
 	
 	@Override
 	public void breakBlock(World world, int x, int y, int z, Block block, int n) {
 		TileEntity tile = world.getTileEntity(x, y, z);
-		if (tile instanceof FlightTile) {
-			((FlightTile)tile).dropAllFlyers();
+		if (tile instanceof FlightTileBase) {
+			((FlightTileBase)tile).dropAllFlyers();
 		}
 		super.breakBlock(world, x, y, z, block, n);
 	}
@@ -67,8 +54,10 @@ public class FlightBlock extends BlockContainer {
 	@Override
 	public ArrayList<ItemStack> getDrops(World world, int x, int y, int z, int metadata, int fortune) {
 		ArrayList<ItemStack> drops = new ArrayList<ItemStack>();
-		if (WinglessFlight.Config.silkTouchRequired && metadata == 1) {
-			drops.add(new ItemStack(Item.getItemFromBlock((Block)Block.blockRegistry.getObject("diamond_block")), 2));
+		if (this.requiresSilkTouch && metadata == 1) {
+			if (this.drop != null) {
+				drops.add(this.drop);
+			}
 		} else {
 			drops.add(new ItemStack(Item.getItemFromBlock(this), 1));
 		}

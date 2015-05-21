@@ -28,21 +28,29 @@ import net.minecraft.util.Vec3;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
 
-public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IFallDamageHandler {
+public class FlightTileBase extends TileEntity implements IPlayerPresenceHandler, IFallDamageHandler {
 
 	private ArrayList<String> flyingWhenLeft = new ArrayList<String>();
 	private ArrayList<String> fallingWhenLeft = new ArrayList<String>();
 	private HashMap<EntityPlayerMP, FlightTicket> tickets = new HashMap<EntityPlayerMP, FlightTicket>();
 	private boolean enabled = false;
 	private int chargeTime = 0;
+	private int chargeDelay = 0;
+	private int radius = 0;
 	
-	public FlightTile() {
+	public FlightTileBase(int radius, int chargeDelay) {
+		this.radius = radius;
+		this.chargeDelay = chargeDelay;
 		PlayerPresenceHandler.instance.addListener(this);
 		FallDamageHandler.instance.addListener(this);
-		if (WinglessFlight.Config.chargeTime == 0) {
+		if (this.chargeDelay == 0) {
 			this.enabled = true;
 			worldObj.setBlockMetadataWithNotify(this.xCoord, this.yCoord, this.zCoord, 1, 6);
 		}
+	}
+	
+	private boolean withinRange(EntityPlayer player) {
+		return (player.posX >= this.xCoord - this.radius && player.posX <= this.xCoord + this.radius + 1 && player.posY >= 0 && player.posY <= 256 && player.posZ >= this.zCoord - this.radius && player.posZ <= this.zCoord + this.radius + 1);
 	}
 	
 	private Vec3 randomSpot(int x0, int y0, int z0) {
@@ -103,8 +111,8 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 		super.updateEntity();
 		if (!worldObj.isRemote){ 
 			if (this.enabled) {
-				float radius = (float) WinglessFlight.Config.radius;
-				List<EntityPlayerMP> players = worldObj.getEntitiesWithinAABB(EntityPlayerMP.class, AxisAlignedBB.getBoundingBox((float)this.xCoord - radius, 0.0f, (float)this.zCoord - radius, (float)this.xCoord + radius, 256.0f, (float)this.zCoord + radius));
+				float radius = (float) this.radius;
+				List<EntityPlayerMP> players = worldObj.getEntitiesWithinAABB(EntityPlayerMP.class, AxisAlignedBB.getBoundingBox((float)this.xCoord - radius, 0.0f, (float)this.zCoord - radius, (float)this.xCoord + radius + 1.0f, 256.0f, (float)this.zCoord + radius + 1.0f));
 				for (EntityPlayerMP player : players) {
 					if (!this.tickets.containsKey(player)) {
 						if (player.isDead) {continue;}
@@ -121,7 +129,7 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 				}
 			} else {
 				this.chargeTime++;
-				if (this.chargeTime > WinglessFlight.Config.chargeTime * 20) {
+				if (this.chargeTime > this.chargeDelay) {
 					this.enabled = true;
 					worldObj.setBlockMetadataWithNotify(this.xCoord, this.yCoord, this.zCoord, 1, 6);
 				}
@@ -190,8 +198,7 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 		if (this.flyingWhenLeft.contains(event.player.getUniqueID().toString())) {
 			WFLog.debug("Player %s logged in and was previously flying", event.player.getDisplayName());
 			this.flyingWhenLeft.remove(event.player.getUniqueID().toString());
-			int radius = WinglessFlight.Config.radius;
-			if (event.player.posX >= this.xCoord - radius && event.player.posX <= this.xCoord + radius && event.player.posY >= 0 && event.player.posY <= 256 && event.player.posZ >= this.zCoord - radius && event.player.posZ <= this.zCoord + radius) {
+			if (withinRange(event.player)) {
 				if (event.player instanceof EntityPlayerMP) {
 					EntityPlayerMP player = (EntityPlayerMP)event.player;
 					flyPlayer(player);
@@ -206,9 +213,8 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 
 	@Override
 	public void onLogout(PlayerLoggedOutEvent event) {
-		int radius = WinglessFlight.Config.radius;
 		PlayerTicketManager manager = ServerTicketManager.instance.getManagerForPlayer(event.player.getUniqueID().toString());
-		if (event.player.capabilities.isFlying && event.player.posX >= this.xCoord - radius && event.player.posX <= this.xCoord + radius && event.player.posY >= 0 && event.player.posY <= 256 && event.player.posZ >= this.zCoord - radius && event.player.posZ <= this.zCoord + radius) {
+		if (event.player.capabilities.isFlying && withinRange(event.player)) {
 			this.flyingWhenLeft.add(event.player.getUniqueID().toString());
 		} else if (manager.getFlightTicketCount() == 0) {
 		}
@@ -218,8 +224,7 @@ public class FlightTile extends TileEntity implements IPlayerPresenceHandler, IF
 	public void onWorldChange(EntityJoinWorldEvent event) {
 		EntityPlayerMP player = (EntityPlayerMP) event.entity;
 		if (event.world.provider.dimensionId == this.worldObj.provider.dimensionId) {
-			int radius = WinglessFlight.Config.radius;
-			if (player.posX >= this.xCoord - radius && player.posX <= this.xCoord + radius && player.posY >= 0 && player.posY <= 256 && player.posZ >= this.zCoord - radius && player.posZ <= this.zCoord + radius) {
+			if (withinRange(player)) {
 				if (!player.isDead) {
 					flyPlayer(player);
 				}
