@@ -16,7 +16,7 @@ import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
-@Mod(modid = "WinglessFlight", name = "WinglessFlight", version = "0.0.6")
+@Mod(modid = "WinglessFlight", name = "WinglessFlight", version = "0.0.7")
 public class WinglessFlight {
 	
 	public static class Blocks {

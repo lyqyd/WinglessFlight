@@ -73,11 +73,14 @@ public class FlightTileBase extends TileEntity implements IPlayerPresenceHandler
 			count = manager.getFlightTicketCount();
 			WFLog.debug("%d, %d, %d dropping player %s, %d -> %d flight tickets", this.xCoord, this.yCoord, this.zCoord, player.getDisplayName(), count, --count);
 		}
-		
-		this.tickets.get(player).setFalling();
-		manager.update();
-		if (manager.getFlightTicketCount() > 0) {
-			this.tickets.remove(player);
+		synchronized(this.tickets) {
+			this.tickets.get(player).setFalling();
+			if (manager != null) {
+				manager.update();
+				if (manager.getFlightTicketCount() > 0) {
+					this.tickets.remove(player);
+				}
+			}
 		}
 	}
 	
@@ -86,12 +89,14 @@ public class FlightTileBase extends TileEntity implements IPlayerPresenceHandler
 		PlayerTicketManager manager = ServerTicketManager.instance.getManagerForPlayer(player);
 		String id = player.getUniqueID().toString();
 		FlightTicket ticket;
-		if (this.tickets.containsKey(player)) {
-			ticket = this.tickets.get(player);
-			ticket.setFlying();
-		} else {
-			ticket = new FlightTicket(this.xCoord, this.yCoord, this.zCoord, this.worldObj.provider.dimensionId, id);
-			this.tickets.put(player, ticket);
+		synchronized(this.tickets) {
+			if (this.tickets.containsKey(player)) {
+				ticket = this.tickets.get(player);
+				ticket.setFlying();
+			} else {
+				ticket = new FlightTicket(this.xCoord, this.yCoord, this.zCoord, this.worldObj.provider.dimensionId, id);
+				this.tickets.put(player, ticket);
+			}
 		}
 		if (manager != null) {
 			count = manager.getFlightTicketCount();
@@ -121,11 +126,17 @@ public class FlightTileBase extends TileEntity implements IPlayerPresenceHandler
 					}
 				}
 				
-				for (EntityPlayerMP tracked : this.tickets.keySet()) {
-					if (this.tickets.get(tracked).isFlying() && !players.contains(tracked) && tracked.dimension == this.worldObj.provider.dimensionId) {
-						WFLog.debug("OoR drop decision, %s: %d, %d", tracked.getDisplayName(), tracked.dimension, this.worldObj.provider.dimensionId);
-						dropPlayer(tracked);
+				ArrayList<EntityPlayerMP> droplist = new ArrayList<EntityPlayerMP>();
+				synchronized(this.tickets) {
+					for (EntityPlayerMP tracked : this.tickets.keySet()) {
+						if (this.tickets.get(tracked).isFlying() && !players.contains(tracked) && tracked.dimension == this.worldObj.provider.dimensionId) {
+							WFLog.debug("OoR drop decision, %s: %d, %d", tracked.getDisplayName(), tracked.dimension, this.worldObj.provider.dimensionId);
+							droplist.add(tracked);
+						}
 					}
+				}
+				for (EntityPlayerMP player : droplist) {
+					dropPlayer(player);
 				}
 			} else {
 				this.chargeTime++;
@@ -166,13 +177,15 @@ public class FlightTileBase extends TileEntity implements IPlayerPresenceHandler
 		
 		NBTTagList names = new NBTTagList();
 		NBTTagList flying = new NBTTagList();
-		for (Entry<EntityPlayerMP, FlightTicket> entry : this.tickets.entrySet()) {
-			EntityPlayerMP player = entry.getKey();
-			String id = player.getUniqueID().toString();
-			if (entry.getValue().isFalling()) {
-				names.appendTag(new NBTTagString(id));
-			} else if (player.capabilities.isFlying) {
-				flying.appendTag(new NBTTagString(id));
+		synchronized(this.tickets) {
+			for (Entry<EntityPlayerMP, FlightTicket> entry : this.tickets.entrySet()) {
+				EntityPlayerMP player = entry.getKey();
+				String id = player.getUniqueID().toString();
+				if (entry.getValue().isFalling()) {
+					names.appendTag(new NBTTagString(id));
+				} else if (player.capabilities.isFlying) {
+					flying.appendTag(new NBTTagString(id));
+				}
 			}
 		}
 		for (String name : this.flyingWhenLeft) {
@@ -188,8 +201,10 @@ public class FlightTileBase extends TileEntity implements IPlayerPresenceHandler
 	}
 	
 	public void dropAllFlyers() {
-		for (EntityPlayerMP player : this.tickets.keySet()) {
-			dropPlayer(player);
+		synchronized(this.tickets) {
+			for (EntityPlayerMP player : this.tickets.keySet()) {
+				dropPlayer(player);
+			}
 		}
 	}
 
@@ -213,10 +228,8 @@ public class FlightTileBase extends TileEntity implements IPlayerPresenceHandler
 
 	@Override
 	public void onLogout(PlayerLoggedOutEvent event) {
-		PlayerTicketManager manager = ServerTicketManager.instance.getManagerForPlayer(event.player.getUniqueID().toString());
 		if (event.player.capabilities.isFlying && withinRange(event.player)) {
 			this.flyingWhenLeft.add(event.player.getUniqueID().toString());
-		} else if (manager.getFlightTicketCount() == 0) {
 		}
 	}
 
@@ -230,8 +243,10 @@ public class FlightTileBase extends TileEntity implements IPlayerPresenceHandler
 				}
 			}
 		} else {
-			if (this.tickets.containsKey(player)) {
-				dropPlayer(player);
+			synchronized(this.tickets) {
+				if (this.tickets.containsKey(player)) {
+					dropPlayer(player);
+				}
 			}
 		}
 	}
@@ -250,7 +265,9 @@ public class FlightTileBase extends TileEntity implements IPlayerPresenceHandler
 	public void onFall(LivingFallEvent event) {
 		if (event.entity instanceof EntityPlayerMP) {
 			EntityPlayerMP player = (EntityPlayerMP) event.entity;
-			this.tickets.remove(player);
+			synchronized(this.tickets) {
+				this.tickets.remove(player);
+			}
 		}
 		
 	}
